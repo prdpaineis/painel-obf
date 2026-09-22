@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fila OBF</title>
+<style>
+:root{
+  color-scheme: light;
+  --plane:#f9f9f7; --surface:#fcfcfb;
+  --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+  --wash:rgba(11,11,11,.04);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --plane:#0d0d0d; --surface:#1a1a19;
+    --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    --wash:rgba(255,255,255,.06);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --plane:#0d0d0d; --surface:#1a1a19;
+  --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --wash:rgba(255,255,255,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--plane); color:var(--ink);
+  font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding:24px 16px 64px;
+}
+.wrap{max-width:1180px;margin:0 auto}
+h1{font-size:22px;margin:0 0 2px;letter-spacing:-.01em}
+.sub{color:var(--ink2);font-size:13px;margin:0}
+header.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+button,select,input[type=search]{
+  font:inherit;font-size:13px;color:var(--ink);background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:6px 10px;
+}
+button,select{cursor:pointer}
+button:hover,select:hover{background:var(--wash)}
+input[type=search]{min-width:230px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+.card h2{font-size:14px;font-weight:650;margin:0 0 2px;letter-spacing:.01em}
+.card .hint{font-size:12px;color:var(--muted);margin:0 0 14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:860px){ .grid2{grid-template-columns:1fr} }
+
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.filters label{font-size:12px;color:var(--ink2);margin-right:4px}
+.chips{display:inline-flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:3px}
+.chip{border:0;background:transparent;border-radius:6px;padding:4px 10px;font-size:13px;display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--wash);font-weight:600;color:var(--ink)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi .lbl{font-size:12px;color:var(--ink2);margin:0 0 6px}
+.kpi .val{font-size:30px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.kpi .note{font-size:12px;color:var(--muted);margin-top:5px;display:flex;gap:10px;flex-wrap:wrap}
+.kpi .note span{display:inline-flex;align-items:center;gap:5px}
+
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin:0 0 10px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+
+svg{display:block;width:100%;height:auto;overflow:visible}
+.tick{font-size:11px;fill:var(--muted)}
+.vlabel{font-size:11px;fill:var(--ink2);font-variant-numeric:tabular-nums}
+
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tallwrap{max-height:560px;overflow:auto;border:1px solid var(--grid);border-radius:8px}
+.tallwrap thead th{position:sticky;top:0;background:var(--surface);z-index:1;box-shadow:0 1px 0 var(--grid)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:right;padding:7px 10px;border-bottom:1px solid var(--grid);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;cursor:pointer;user-select:none}
+th:hover{color:var(--ink)}
+tbody tr:hover{background:var(--wash)}
+td.num{font-variant-numeric:tabular-nums}
+td.txt{text-align:left;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+tfoot td{font-weight:650;border-top:2px solid var(--axis);border-bottom:0}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid var(--border)}
+.pill.crit{color:var(--crit);border-color:var(--crit)}
+.pill.ser{color:var(--serious);border-color:var(--serious)}
+.pill.ok{color:var(--good);border-color:var(--good)}
+.vermelho{color:var(--crit);font-weight:600}
+
+#tip{
+  position:fixed;pointer-events:none;z-index:50;opacity:0;transition:opacity .08s;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:8px 10px;font-size:12px;box-shadow:0 6px 20px rgba(0,0,0,.14);max-width:280px;
+}
+#tip .row{display:flex;justify-content:space-between;gap:14px}
+#tip b{font-variant-numeric:tabular-nums}
+.note{font-size:12px;color:var(--muted);line-height:1.7}
+.note code{font-size:11px;background:var(--wash);padding:1px 4px;border-radius:4px}
+.empty{color:var(--muted);font-size:13px;padding:18px 0;text-align:center}
+@media (max-width:640px){ body{padding:16px 16px 48px} .kpi .val{font-size:26px} }
+</style>
+</head>
+<body>
+<div id="tip" role="status" aria-live="polite"></div>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>Fila OBF</h1>
+      <p class="sub">Só as ações <strong>pendentes</strong> de Triar, Solicitar e Verificar obrigação &mdash; <span id="meta"></span></p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button id="tema" type="button">Tema</button>
+      <button id="csvTudo" type="button">CSV da fila inteira</button>
+    </div>
+  </header>
+
+  <div class="filters">
+    <span><label for="fGrupo">Grupo</label><select id="fGrupo"></select></span>
+    <span class="chips" id="fEtapas" role="group" aria-label="Etapas"></span>
+    <span class="chips" id="fBola" role="group" aria-label="De quem está a bola"></span>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card">
+    <h2>Quando essa fila entrou</h2>
+    <p class="hint">Mês de criação de cada ação que ainda está pendente. Mês antigo com barra alta é atraso acumulado, não volume de trabalho.</p>
+    <div class="legend" id="legEtapas"></div>
+    <div id="cCriados"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Idade da fila</h2>
+      <p class="hint">Dias desde a criação da ação pendente.</p>
+      <div id="cIdade"></div>
+    </div>
+    <div class="card">
+      <h2>Prazo do cumprimento</h2>
+      <p class="hint">Distância até o prazo da obrigação. À esquerda do zero, já venceu.</p>
+      <div id="cPrazo"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>A fila por grupo</h2>
+    <div class="legend" id="legEtapas2"></div>
+    <div id="cGrupo"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>O que o cliente respondeu</h2>
+      <p class="hint">Lido do campo <em>Cumprimento Pendência</em> da ação pendente. Só a etapa Verificar tem resposta; Triar e Solicitar ainda nem foram ao cliente.</p>
+      <div id="cResposta"></div>
+    </div>
+    <div class="card">
+      <h2>Por que recusou ou cancelou</h2>
+      <p class="hint">Motivo declarado nas <span id="nRecusa">—</span> ações que voltaram recusadas ou canceladas.</p>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--crit)"></i>Recusada</span>
+        <span><i class="dot" style="background:var(--serious)"></i>Cancelada</span>
+      </div>
+      <div id="cMotivo"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Quadro analítico</h2>
+    <p class="hint">Clique no cabeçalho para ordenar.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <label for="fQuebra" style="font-size:12px;color:var(--ink2)">Quebrar por</label>
+      <select id="fQuebra">
+        <option value="acao">Ação</option>
+        <option value="grupo" selected>Grupo</option>
+        <option value="grupo_acao">Grupo &times; ação</option>
+        <option value="resp">Responsável</option>
+      </select>
+      <button id="csvQuadro" type="button">CSV do quadro</button>
+    </div>
+    <div class="tablewrap"><table id="tQuadro"></table></div>
+  </div>
+
+  <div class="card">
+    <h2>Fila detalhada</h2>
+    <p class="hint">Uma linha por ação pendente. <em>Dias</em> conta desde a criação; <em>prazo</em> negativo já venceu.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <input type="search" id="busca" placeholder="Buscar processo, caso, subtipo, motivo, responsável…">
+      <select id="fFila">
+        <option value="todos">Tudo que está na fila</option>
+        <option value="recusa">Recusadas e canceladas</option>
+        <option value="cliente">Paradas com o cliente</option>
+        <option value="vencido">Com prazo vencido</option>
+        <option value="velhos">Paradas há mais de 30 dias</option>
+        <option value="risco">Com risco de multa ou desobediência</option>
+      </select>
+      <button id="csvFila" type="button">CSV do que está na tela</button>
+    </div>
+    <div class="tablewrap tallwrap"><table id="tFila"></table></div>
+    <p class="note" id="paginaFila"></p>
+  </div>
+
+  <div class="card">
+    <h2>Como cada número foi apurado</h2>
+    <p class="note" id="metodologia"></p>
+  </div>
+
+</div>
+
+<script>
+const D = /*__DADOS__*/ null;
+
+/* ------------------------------------------------------------------ util */
+const $ = s => document.querySelector(s);
+const fmt = n => (n||0).toLocaleString('pt-BR');
+const pct = (a,b) => b ? (100*a/b).toFixed(1).replace('.',',')+'%' : '—';
+const ETAPAS = [
+  {id:1601, nome:'Triar',     cor:'var(--s1)'},
+  {id:837,  nome:'Solicitar', cor:'var(--s2)'},
+  {id:838,  nome:'Verificar', cor:'var(--s3)'}
+];
+const BOLAS = [
+  {id:'nos',     nome:'Conosco'},
+  {id:'cliente', nome:'Com o cliente'},
+  {id:'ok',      nome:'Respondida OK'}
+];
+const corEtapa  = id => (ETAPAS.find(e=>e.id===id)||{}).cor  || 'var(--muted)';
+const nomeEtapa = id => (ETAPAS.find(e=>e.id===id)||{}).nome || id;
+const nomeBola  = id => (BOLAS.find(b=>b.id===id)||{}).nome  || id;
+const MESNOME = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const rotMes = m => { const [a,b]=m.split('-'); return MESNOME[+b-1]+'/'+a.slice(2); };
+const FAIXAS = ['0-7 dias','8-15 dias','16-30 dias','31-60 dias','61-90 dias','90+ dias'];
+/* cor do status: recusa/cancelamento usam a paleta de estado, sempre com rótulo ao lado */
+const CORSTATUS = {
+  'Recusada':'var(--crit)', 'Cancelada':'var(--serious)', 'OK':'var(--good)',
+  'Analisando':'var(--s1)', 'Cumprindo':'var(--s1)',
+  'Observacao':'var(--muted)', 'Sem resposta':'var(--axis)'
+};
+const ROTSTATUS = {'Observacao':'Observação'};
+const rotStatus = s => ROTSTATUS[s] || s;
+
+const estado = { grupo:'__todos__', etapas:new Set([1601,837,838]), bolas:new Set(['nos','cliente','ok']) };
+const visivel = p => (estado.grupo==='__todos__' || p.g===estado.grupo)
+                  && estado.etapas.has(p.a) && estado.bolas.has(p.b);
+const fila = () => D.pend.filter(visivel);
+const mediana = arr => {
+  if (!arr.length) return null;
+  const a = [...arr].sort((x,y)=>x-y), m = a.length>>1;
+  return a.length % 2 ? a[m] : Math.round((a[m-1]+a[m])/2);
+};
+
+/* --------------------------------------------------------------- tooltip */
+const tip = $('#tip');
+function mostraTip(ev, html){
+  tip.innerHTML = html; tip.style.opacity = 1;
+  const r = tip.getBoundingClientRect();
+  let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + r.width  > innerWidth  - 8) x = ev.clientX - r.width  - 14;
+  if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - 14;
+  tip.style.left = Math.max(8,x)+'px'; tip.style.top = Math.max(8,y)+'px';
+}
+const escondeTip = () => { tip.style.opacity = 0; };
+addEventListener('scroll', escondeTip, {passive:true});
+function ligaTip(el, html){
+  el.addEventListener('mousemove', e => mostraTip(e, html));
+  el.addEventListener('mouseleave', escondeTip);
+  el.setAttribute('tabindex','0');
+  el.addEventListener('focus', () => {
+    const b = el.getBoundingClientRect();
+    mostraTip({clientX:b.left+b.width/2, clientY:b.top}, html);
+  });
+  el.addEventListener('blur', escondeTip);
+}
+
+/* --------------------------------------------------------------- svg base */
+const NS = 'http://www.w3.org/2000/svg';
+const svgEl = (t, a) => { const e = document.createElementNS(NS,t);
+  for (const k in a) e.setAttribute(k, a[k]); return e; };
+function barraV(x,y,w,h,r,arred){
+  if (h<=0) return ''; r = Math.min(r,w/2,h);
+  if (!arred||r<=0) return `M${x},${y}h${w}v${h}h${-w}z`;
+  return `M${x},${y+r}a${r},${r} 0 0 1 ${r},${-r}h${w-2*r}a${r},${r} 0 0 1 ${r},${r}v${h-r}h${-w}z`;
+}
+function barraH(x,y,w,h,r,arred){
+  if (w<=0) return ''; r = Math.min(r,h/2,w);
+  if (!arred||r<=0) return `M${x},${y}h${w}v${h}h${-w}z`;
+  return `M${x},${y}h${w-r}a${r},${r} 0 0 1 ${r},${r}v${h-2*r}a${r},${r} 0 0 1 ${-r},${r}h${-(w-r)}z`;
+}
+function escalaBonita(max){
+  if (max<=0) return {top:1, passos:[0,1]};
+  const bruto = max/4, mag = Math.pow(10, Math.floor(Math.log10(bruto)));
+  const passo = [1,2,2.5,5,10].map(m=>m*mag).find(v=>v>=bruto) || 10*mag;
+  const top = Math.ceil(max/passo)*passo;
+  const passos = []; for (let v=0; v<=top+1e-9; v+=passo) passos.push(v);
+  return {top, passos};
+}
+
+/**
+ * Barras verticais empilhadas. series = [{k, nome, cor}]
+ * `opt.W` importa: o viewBox tem que acompanhar a largura real do card, senão
+ * um gráfico de meia largura encolhe a tipografia junto com o desenho.
+ */
+function colunas(host, dados, series, rotulo, aria, opt){
+  opt = opt || {};
+  host.innerHTML = '';
+  dados.forEach(d => d._t = series.reduce((t,s)=>t+(d[s.k]||0), 0));
+  const max = Math.max(1, ...dados.map(d=>d._t));
+  const {top, passos} = escalaBonita(max);
+  const W=opt.W||1000, H=opt.H||290, ml=46, mr=10, mt=16, mb=34, pw=W-ml-mr, ph=H-mt-mb;
+  const svg = svgEl('svg',{viewBox:`0 0 ${W} ${H}`, role:'img','aria-label':aria});
+  passos.forEach(v => {
+    const y = mt+ph-(v/top)*ph;
+    svg.appendChild(svgEl('line',{x1:ml,x2:W-mr,y1:y,y2:y,stroke:'var(--grid)','stroke-width':1}));
+    const t = svgEl('text',{x:ml-8,y:y+4,'text-anchor':'end',class:'tick'});
+    t.textContent = fmt(v); svg.appendChild(t);
+  });
+  const passoX = pw/Math.max(1,dados.length), bw = Math.min(opt.bw||46, passoX*0.62);
+  dados.forEach((d,i) => {
+    const x = ml+passoX*i+(passoX-bw)/2;
+    let y = mt+ph;
+    const vis = series.filter(s => (d[s.k]||0) > 0);
+    vis.forEach((s,k) => {
+      const h = (d[s.k]/top)*ph, gap = k<vis.length-1 ? 2 : 0;
+      const p = svgEl('path',{d:barraV(x, y-h, bw, Math.max(0,h-gap), 4, k===vis.length-1),
+                              fill:s.cor,'shape-rendering':'crispEdges'});
+      ligaTip(p, `<b>${rotulo(d)}</b><br>${s.nome}<div class="row"><span>ações</span><b>${fmt(d[s.k])}</b></div>`);
+      svg.appendChild(p); y -= h;
+    });
+    if (d._t){
+      const t = svgEl('text',{x:x+bw/2, y:mt+ph-(d._t/top)*ph-7,'text-anchor':'middle',class:'vlabel'});
+      t.textContent = fmt(d._t); svg.appendChild(t);
+    }
+    const lab = svgEl('text',{x:ml+passoX*i+passoX/2, y:H-mb+18,'text-anchor':'middle',class:'tick'});
+    lab.textContent = rotulo(d); svg.appendChild(lab);
+  });
+  svg.appendChild(svgEl('line',{x1:ml,x2:W-mr,y1:mt+ph,y2:mt+ph,stroke:'var(--axis)','stroke-width':1}));
+  host.appendChild(svg);
+}
+
+/** Barras horizontais. linhas = [{rot, total, cor?, partes?:[{k,nome,cor,v}]}] */
+function barras(host, linhas, aria, larguraRotulo=160, larguraTotal=1000){
+  host.innerHTML = '';
+  if (!linhas.length){ host.innerHTML = '<p class="empty">Nada com esses filtros.</p>'; return; }
+  const max = Math.max(1, ...linhas.map(l=>l.total));
+  const {top, passos} = escalaBonita(max);
+  const alt = 30, ml = larguraRotulo, mr = 56, mt = 8, mb = 28;
+  const W = larguraTotal, H = mt+mb+linhas.length*alt, pw = W-ml-mr;
+  const svg = svgEl('svg',{viewBox:`0 0 ${W} ${H}`, role:'img','aria-label':aria});
+  passos.forEach(v => {
+    const x = ml+(v/top)*pw;
+    svg.appendChild(svgEl('line',{x1:x,x2:x,y1:mt,y2:mt+linhas.length*alt,stroke:'var(--grid)','stroke-width':1}));
+    const t = svgEl('text',{x, y:H-mb+18,'text-anchor':'middle',class:'tick'});
+    t.textContent = fmt(v); svg.appendChild(t);
+  });
+  linhas.forEach((l,i) => {
+    const y = mt+i*alt+6, bh = alt-14;
+    const nm = svgEl('text',{x:ml-10, y:y+bh/2+4,'text-anchor':'end',class:'vlabel'});
+    const corte = Math.floor(larguraRotulo/7);
+    nm.textContent = l.rot.length>corte ? l.rot.slice(0,corte-1)+'…' : l.rot;
+    if (l.rot.length>corte){ const ti=svgEl('title'); ti.textContent=l.rot; nm.appendChild(ti); }
+    svg.appendChild(nm);
+    const partes = l.partes || [{nome:l.rot, cor:l.cor||'var(--s1)', v:l.total}];
+    let x = ml;
+    const vis = partes.filter(p=>p.v>0);
+    vis.forEach((p,k) => {
+      const w = (p.v/top)*pw, gap = k<vis.length-1 ? 2 : 0;
+      const el = svgEl('path',{d:barraH(x, y, Math.max(0,w-gap), bh, 4, k===vis.length-1),
+                               fill:p.cor,'shape-rendering':'crispEdges'});
+      ligaTip(el, `<b>${l.rot}</b>${partes.length>1 ? '<br>'+p.nome : ''}`
+                + `<div class="row"><span>ações</span><b>${fmt(p.v)}</b></div>`);
+      svg.appendChild(el); x += w;
+    });
+    const t = svgEl('text',{x:ml+(l.total/top)*pw+8, y:y+bh/2+4, class:'vlabel'});
+    t.textContent = fmt(l.total); svg.appendChild(t);
+  });
+  svg.appendChild(svgEl('line',{x1:ml,x2:ml,y1:mt,y2:mt+linhas.length*alt,stroke:'var(--axis)','stroke-width':1}));
+  host.appendChild(svg);
+}
+
+/* ============================================================= gráficos */
+const MESES_EIXO = 12;
+function grCriados(){
+  const f = fila();
+  const meses = [...new Set(f.map(p=>p.m).filter(Boolean))].sort();
+  const recentes = meses.slice(-MESES_EIXO);
+  const antigos = new Set(meses.slice(0, -MESES_EIXO));
+  // a cauda de meses velhos vira uma coluna só: o que importa dela é o tamanho
+  const dados = [];
+  if (antigos.size){
+    const o = {m:null, rot:'antes de '+rotMes(recentes[0])};
+    ETAPAS.forEach(e => o[e.id] = f.filter(p=>antigos.has(p.m) && p.a===e.id).length);
+    dados.push(o);
+  }
+  recentes.forEach(m => {
+    const o = {m, rot:rotMes(m)};
+    ETAPAS.forEach(e => o[e.id] = f.filter(p=>p.m===m && p.a===e.id).length);
+    dados.push(o);
+  });
+  const series = ETAPAS.filter(e=>estado.etapas.has(e.id))
+                       .map(e=>({k:e.id, nome:e.nome+' OBF', cor:e.cor}));
+  colunas($('#cCriados'), dados, series, d=>d.rot,
+          'Ações pendentes por mês de criação, empilhadas por etapa');
+}
+
+function grIdade(){
+  const f = fila(), host = $('#cIdade');
+  const dados = FAIXAS.map(fx => ({fx, n:f.filter(p=>p.fx===fx).length}));
+  const series = [{k:'n', nome:'na fila', cor:'var(--s1)'}];
+  // as duas faixas mais velhas ganham a cor de estado; o eixo já diz qual é qual
+  host.innerHTML='';
+  colunas(host, dados, series, d=>d.fx, 'Ações pendentes por faixa de idade',
+          {W:520, H:300, bw:44});
+  host.querySelectorAll('path').forEach((p,i) => {
+    if (FAIXAS[i]==='90+ dias') p.setAttribute('fill','var(--crit)');
+    if (FAIXAS[i]==='61-90 dias') p.setAttribute('fill','var(--serious)');
+  });
+}
+
+const FX_PRAZO = [
+  {rot:'venceu há 90+', t:p=>p.dp!==null && p.dp<=-90},
+  {rot:'venceu há 31-90', t:p=>p.dp!==null && p.dp<=-31 && p.dp>-90},
+  {rot:'venceu há 1-30', t:p=>p.dp!==null && p.dp<0 && p.dp>-31},
+  {rot:'vence em 0-7', t:p=>p.dp!==null && p.dp>=0 && p.dp<=7},
+  {rot:'vence em 8+', t:p=>p.dp!==null && p.dp>7},
+  {rot:'sem prazo', t:p=>p.dp===null}
+];
+function grPrazo(){
+  const f = fila(), host = $('#cPrazo');
+  const dados = FX_PRAZO.map(x => ({rot:x.rot, n:f.filter(x.t).length}));
+  host.innerHTML='';
+  colunas(host, dados, [{k:'n', nome:'na fila', cor:'var(--s1)'}], d=>d.rot,
+          'Ações pendentes por distância até o prazo', {W:520, H:300, bw:44});
+  host.querySelectorAll('path').forEach((p,i) => {
+    if (i<=1) p.setAttribute('fill','var(--crit)');
+    else if (i===2) p.setAttribute('fill','var(--serious)');
+    else if (i===5) p.setAttribute('fill','var(--axis)');
+  });
+}
+
+function grGrupo(){
+  const f = fila();
+  const por = {};
+  f.forEach(p => {
+    por[p.g] = por[p.g] || {rot:p.g, total:0, 1601:0, 837:0, 838:0};
+    por[p.g][p.a]++; por[p.g].total++;
+  });
+  const linhas = Object.values(por).sort((a,b)=>b.total-a.total).slice(0,14)
+    .map(l => ({...l, partes: ETAPAS.filter(e=>estado.etapas.has(e.id))
+                 .map(e=>({nome:e.nome+' OBF', cor:e.cor, v:l[e.id]}))}));
+  barras($('#cGrupo'), linhas, 'Ações pendentes por grupo, empilhadas por etapa', 170);
+}
+
+function grResposta(){
+  const f = fila();
+  const ordem = ['Sem resposta','OK','Analisando','Cumprindo','Recusada','Cancelada','Observacao'];
+  const linhas = ordem.map(s => ({rot:rotStatus(s), cor:CORSTATUS[s],
+                                  total:f.filter(p=>p.st===s).length}))
+                      .filter(l=>l.total>0);
+  barras($('#cResposta'), linhas, 'Ações pendentes por resposta do cliente', 110, 520);
+}
+
+function grMotivo(){
+  const f = fila().filter(p => p.st==='Recusada' || p.st==='Cancelada');
+  $('#nRecusa').textContent = fmt(f.length);
+  const por = {};
+  f.forEach(p => {
+    const m = p.mo || '(sem motivo declarado)';
+    por[m] = por[m] || {rot:m, total:0, rec:0, can:0};
+    por[m].total++; por[m][p.st==='Recusada'?'rec':'can']++;
+  });
+  const linhas = Object.values(por).sort((a,b)=>b.total-a.total).slice(0,12)
+    .map(l => ({...l, partes:[{nome:'Recusada', cor:'var(--crit)', v:l.rec},
+                              {nome:'Cancelada', cor:'var(--serious)', v:l.can}]}));
+  barras($('#cMotivo'), linhas, 'Motivos declarados de recusa ou cancelamento', 175, 520);
+}
+
+/* ============================================================= KPIs */
+function kpis(){
+  const f = fila();
+  const cliente = f.filter(p=>p.b==='cliente').length;
+  const recusa  = f.filter(p=>p.st==='Recusada').length;
+  const cancel  = f.filter(p=>p.st==='Cancelada').length;
+  const vencido = f.filter(p=>p.v).length;
+  const med = mediana(f.map(p=>p.d).filter(d=>d!==null));
+
+  const porEtapa = ETAPAS.filter(e=>estado.etapas.has(e.id))
+    .map(e=>`<span><i class="dot" style="background:${e.cor}"></i>${e.nome} ${fmt(f.filter(p=>p.a===e.id).length)}</span>`)
+    .join('');
+
+  $('#kpis').innerHTML = `
+    <div class="kpi">
+      <p class="lbl">Ações na fila</p>
+      <div class="val">${fmt(f.length)}</div>
+      <div class="note">${porEtapa}</div>
+    </div>
+    <div class="kpi">
+      <p class="lbl">Paradas com o cliente</p>
+      <div class="val">${fmt(cliente)}</div>
+      <div class="note"><span>${pct(cliente, f.length)} da fila — solicitada, aguardando o banco</span></div>
+    </div>
+    <div class="kpi">
+      <p class="lbl">Voltaram recusadas ou canceladas</p>
+      <div class="val" ${recusa+cancel ? 'style="color:var(--crit)"' : ''}>${fmt(recusa+cancel)}</div>
+      <div class="note"><span><i class="dot" style="background:var(--crit)"></i>${fmt(recusa)} recusadas</span>
+                        <span><i class="dot" style="background:var(--serious)"></i>${fmt(cancel)} canceladas</span></div>
+    </div>
+    <div class="kpi">
+      <p class="lbl">Com prazo vencido</p>
+      <div class="val" ${vencido ? 'style="color:var(--crit)"' : ''}>${fmt(vencido)}</div>
+      <div class="note"><span>${pct(vencido, f.length)} da fila · idade mediana ${med===null?'—':fmt(med)+' dias'}</span></div>
+    </div>`;
+}
+
+/* ============================================ quadro (ação / grupo / resp) */
+let ordQuadro = {col:'total', dir:-1}, quadroAtual = [];
+function montaQuadro(quebra){
+  const linhas = {};
+  fila().forEach(p => {
+    const k = quebra==='acao'  ? `a:${p.a}`
+            : quebra==='grupo' ? `g:${p.g}`
+            : quebra==='resp'  ? `r:${p.resp}`
+            : `g:${p.g}|a:${p.a}`;
+    const l = linhas[k] = linhas[k] || {
+      k, acao: quebra==='grupo'||quebra==='resp' ? null : p.a,
+      rot: quebra==='acao' ? nomeEtapa(p.a)
+         : quebra==='grupo' ? p.g
+         : quebra==='resp' ? p.resp
+         : `${p.g} · ${nomeEtapa(p.a)}`,
+      total:0, nos:0, cliente:0, ok:0, rec:0, can:0, venc:0, d30:0, idades:[]
+    };
+    l.total++;
+    l[p.b === 'cliente' ? 'cliente' : p.b === 'ok' ? 'ok' : 'nos']++;
+    if (p.st==='Recusada')  l.rec++;
+    if (p.st==='Cancelada') l.can++;
+    if (p.v) l.venc++;
+    if (p.d !== null && p.d > 30) l.d30++;
+    if (p.d !== null) l.idades.push(p.d);
+  });
+  return Object.values(linhas).map(l => ({...l, med: mediana(l.idades)}));
+}
+function tabQuadro(){
+  const quebra = $('#fQuebra').value;
+  const arr = montaQuadro(quebra);
+  arr.sort((a,b)=>{
+    const x = a[ordQuadro.col] ?? 0, y = b[ordQuadro.col] ?? 0;
+    return (typeof x==='string' ? x.localeCompare(y) : x-y) * ordQuadro.dir;
+  });
+  quadroAtual = arr;
+  const T = arr.reduce((t,l)=>{ for (const k of ['total','nos','cliente','ok','rec','can','venc','d30']) t[k]+=l[k];
+                                t.idades.push(...l.idades); return t; },
+                       {total:0,nos:0,cliente:0,ok:0,rec:0,can:0,venc:0,d30:0,idades:[]});
+  const rotEixo = quebra==='acao' ? 'Ação' : quebra==='grupo' ? 'Grupo'
+                : quebra==='resp' ? 'Responsável' : 'Grupo × ação';
+  const cols = [['rot',rotEixo],['total','Na fila'],['nos','Conosco'],['cliente','Com o cliente'],
+                ['ok','Respondida OK'],['rec','Recusada'],['can','Cancelada'],
+                ['venc','Prazo vencido'],['d30','+30 dias'],['med','Idade mediana']];
+  const ponto = l => l.acao ? `<i class="dot" style="background:${corEtapa(l.acao)}"></i> ` : '';
+  const vermelho = (v) => v ? ` class="num vermelho"` : ' class="num"';
+
+  $('#tQuadro').innerHTML =
+    `<thead><tr>${cols.map(([k,r]) =>
+        `<th data-col="${k}">${r}${ordQuadro.col===k ? (ordQuadro.dir<0?' ↓':' ↑') : ''}</th>`).join('')}</tr></thead>
+     <tbody>${arr.map(l=>`<tr>
+        <td>${ponto(l)}${l.rot}</td>
+        <td class="num">${fmt(l.total)}</td>
+        <td class="num">${fmt(l.nos)}</td>
+        <td class="num">${fmt(l.cliente)}</td>
+        <td class="num">${fmt(l.ok)}</td>
+        <td${vermelho(l.rec)}>${fmt(l.rec)}</td>
+        <td class="num">${fmt(l.can)}</td>
+        <td${vermelho(l.venc)}>${fmt(l.venc)}</td>
+        <td class="num">${fmt(l.d30)}</td>
+        <td class="num">${l.med===null?'—':fmt(l.med)}</td></tr>`).join('')
+        || '<tr><td colspan="10" class="empty">Nada com esses filtros.</td></tr>'}</tbody>
+     <tfoot><tr><td>Total</td><td class="num">${fmt(T.total)}</td><td class="num">${fmt(T.nos)}</td>
+       <td class="num">${fmt(T.cliente)}</td><td class="num">${fmt(T.ok)}</td><td class="num">${fmt(T.rec)}</td>
+       <td class="num">${fmt(T.can)}</td><td class="num">${fmt(T.venc)}</td><td class="num">${fmt(T.d30)}</td>
+       <td class="num">${mediana(T.idades) ?? '—'}</td></tr></tfoot>`;
+
+  $('#tQuadro').querySelectorAll('th').forEach(th => th.onclick = () => {
+    const c = th.dataset.col;
+    ordQuadro = {col:c, dir: ordQuadro.col===c ? -ordQuadro.dir : (c==='rot' ? 1 : -1)};
+    tabQuadro();
+  });
+}
+
+/* ============================================================ fila detalhada */
+let ordFila = {col:'d', dir:-1}, filaAtual = [];
+const LIMITE = 300;
+function tabFila(){
+  const modo = $('#fFila').value, q = $('#busca').value.trim().toLowerCase();
+  filaAtual = fila().filter(p => {
+    if (modo==='recusa'  && !(p.st==='Recusada' || p.st==='Cancelada')) return false;
+    if (modo==='cliente' && p.b!=='cliente') return false;
+    if (modo==='vencido' && !p.v) return false;
+    if (modo==='velhos'  && !(p.d!==null && p.d>30)) return false;
+    if (modo==='risco'   && !(p.mul || p.des)) return false;
+    if (q && !`${p.proc} ${p.caso} ${p.sub} ${p.prod} ${p.mo} ${p.resp} ${p.g}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  filaAtual.sort((a,b)=>{
+    const x = a[ordFila.col] ?? '', y = b[ordFila.col] ?? '';
+    return (typeof x==='string' ? x.localeCompare(y) : x-y) * ordFila.dir;
+  });
+  const vis = filaAtual.slice(0, LIMITE);
+  // Resposta e Motivo sao o que se olha primeiro; ficam antes das datas
+  const cols = [['a','Etapa'],['g','Grupo'],['proc','Processo'],
+                ['st','Resposta'],['mo','Motivo'],
+                ['d','Dias'],['dp','P/ prazo'],['cri','Criado em'],['prazo','Prazo'],
+                ['sub','Subtipo'],['resp','Responsável']];
+  const pillStatus = p => {
+    if (p.st==='Recusada')  return '<span class="pill crit">Recusada</span>';
+    if (p.st==='Cancelada') return '<span class="pill ser">Cancelada</span>';
+    if (p.st==='OK')        return '<span class="pill ok">OK</span>';
+    if (p.st==='Sem resposta') return '<span style="color:var(--muted)">—</span>';
+    return `<span class="pill">${rotStatus(p.st)}</span>`;
+  };
+  $('#tFila').innerHTML =
+    `<thead><tr>${cols.map(([k,r]) =>
+        `<th data-col="${k}">${r}${ordFila.col===k ? (ordFila.dir<0?' ↓':' ↑') : ''}</th>`).join('')}</tr></thead>
+     <tbody>${vis.map(p=>`<tr>
+        <td><i class="dot" style="background:${corEtapa(p.a)}"></i> ${nomeEtapa(p.a)}</td>
+        <td>${p.g}</td>
+        <td>${p.proc || '<span style="color:var(--muted)">—</span>'}</td>
+        <td>${pillStatus(p)}
+            ${p.mul ? '<span class="pill crit" title="Risco de multa">multa</span>' : ''}
+            ${p.des ? '<span class="pill crit" title="Risco de desobediência">desob.</span>' : ''}</td>
+        <td class="txt" title="${(p.pt||'').replace(/"/g,'&quot;')}">${p.mo || '—'}</td>
+        <td class="num${p.d>30?' vermelho':''}">${p.d ?? '—'}</td>
+        <td class="num${p.v?' vermelho':''}">${p.dp ?? '—'}</td>
+        <td class="num">${p.cri || '—'}</td>
+        <td class="num">${p.prazo || '—'}</td>
+        <td class="txt" title="${(p.sub||'').replace(/"/g,'&quot;')}">${p.sub || '—'}</td>
+        <td>${p.resp}</td></tr>`).join('')
+        || '<tr><td colspan="11" class="empty">Nada com esses filtros.</td></tr>'}</tbody>`;
+  $('#paginaFila').textContent = filaAtual.length > LIMITE
+    ? `Mostrando as ${LIMITE} primeiras de ${fmt(filaAtual.length)} linhas — use o CSV para a lista completa.`
+    : `${fmt(filaAtual.length)} linha(s).`;
+  $('#tFila').querySelectorAll('th').forEach(th => th.onclick = () => {
+    const c = th.dataset.col;
+    ordFila = {col:c, dir: ordFila.col===c ? -ordFila.dir : (['d','dp'].includes(c) ? -1 : 1)};
+    tabFila();
+  });
+}
+
+/* ============================================================ CSV */
+const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+function baixa(nome, cab, linhas){
+  const blob = new Blob(['﻿'+[cab.join(';'), ...linhas].join('\r\n')],
+                        {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nome; a.click(); URL.revokeObjectURL(a.href);
+}
+function csvFila(linhas, nome){
+  baixa(nome,
+    ['etapa','grupo','caso','processo','uf','fase','subtipo','produto','contrato','lote',
+     'criado_em','dias_parado','prazo','dias_ate_prazo','prazo_vencido','bola',
+     'resposta_cliente','motivo','pendencia_texto','risco_multa','risco_desobediencia','responsavel'],
+    linhas.map(p => [nomeEtapa(p.a),p.g,p.caso,p.proc,p.uf,p.fase,p.sub,p.prod,p.ct,p.lt,
+      p.cri,p.d,p.prazo,p.dp,p.v?'sim':'nao',nomeBola(p.b),rotStatus(p.st),p.mo,p.pt,
+      p.mul?'sim':'nao',p.des?'sim':'nao',p.resp].map(esc).join(';')));
+}
+
+/* ============================================================ montagem */
+function legendas(){
+  const html = ETAPAS.filter(e=>estado.etapas.has(e.id))
+    .map(e=>`<span><i class="dot" style="background:${e.cor}"></i>${e.nome} OBF</span>`).join('');
+  $('#legEtapas').innerHTML = html;
+  $('#legEtapas2').innerHTML = html;
+}
+function desenha(){
+  legendas(); kpis();
+  grCriados(); grIdade(); grPrazo(); grGrupo(); grResposta(); grMotivo();
+  tabQuadro(); tabFila();
+}
+
+function chips(host, itens, conjunto, cor){
+  host.innerHTML = itens.map(i =>
+    `<button class="chip" type="button" data-id="${i.id}" aria-pressed="true">
+       ${cor ? `<i class="dot" style="background:${i.cor}"></i>` : ''}${i.nome}</button>`).join('');
+  host.querySelectorAll('.chip').forEach(b => b.onclick = () => {
+    const id = isNaN(+b.dataset.id) ? b.dataset.id : +b.dataset.id;
+    if (conjunto.has(id)){
+      if (conjunto.size === 1) return;              // nunca esvazia o filtro
+      conjunto.delete(id); b.setAttribute('aria-pressed','false');
+    } else { conjunto.add(id); b.setAttribute('aria-pressed','true'); }
+    desenha();
+  });
+}
+
+function init(){
+  $('#meta').textContent = `foto de ${new Date(D.gerado_em).toLocaleString('pt-BR')}`;
+
+  const sel = $('#fGrupo');
+  sel.innerHTML = '<option value="__todos__">Todos os grupos</option>' +
+    D.grupos.map(g=>`<option value="${g.replace(/"/g,'&quot;')}">${g}</option>`).join('');
+  sel.onchange = () => { estado.grupo = sel.value; desenha(); };
+
+  chips($('#fEtapas'), ETAPAS, estado.etapas, true);
+  chips($('#fBola'), BOLAS, estado.bolas, false);
+
+  $('#fQuebra').onchange = () => { ordQuadro = {col:'total', dir:-1}; tabQuadro(); };
+  $('#fFila').onchange = tabFila;
+  let deb; $('#busca').oninput = () => { clearTimeout(deb); deb = setTimeout(tabFila, 150); };
+
+  $('#csvFila').onclick = () => csvFila(filaAtual, 'fila_obf_filtrada.csv');
+  $('#csvTudo').onclick = () => csvFila(D.pend, 'fila_obf_completa.csv');
+  $('#csvQuadro').onclick = () => baixa('quadro_obf.csv',
+    ['recorte','na_fila','conosco','com_o_cliente','respondida_ok','recusada','cancelada',
+     'prazo_vencido','mais_de_30_dias','idade_mediana'],
+    quadroAtual.map(l => [l.rot,l.total,l.nos,l.cliente,l.ok,l.rec,l.can,l.venc,l.d30,l.med].map(esc).join(';')));
+
+  $('#tema').onclick = () => {
+    const escuro = document.documentElement.getAttribute('data-theme') === 'dark'
+      || (!document.documentElement.getAttribute('data-theme')
+          && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.setAttribute('data-theme', escuro ? 'light' : 'dark');
+  };
+
+  $('#metodologia').innerHTML = D.metodologia;
+  desenha();
+}
+init();
+</script>
+</body>
+</html>

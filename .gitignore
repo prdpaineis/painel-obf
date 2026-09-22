@@ -1,0 +1,24 @@
+# credenciais do Odoo - NUNCA commitar
+*.env
+!*.env.example
+.secrets/
+
+# dados extraidos (snapshots brutos): NAO sao publicados, so o docs/index.html
+# gerado a partir deles (dados curados, embutidos, publicados de proposito)
+dados/
+*.json
+
+# CSVs baixados pelo painel
+fila_obf_*.csv
+quadro_obf.csv
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# sistema
+Thumbs.db
+desktop.ini
+.DS_Store
